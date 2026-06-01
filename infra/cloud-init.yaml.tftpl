@@ -127,8 +127,11 @@ runcmd:
   - [bash, -lc, "install -o caddy -g caddy -m 0644 /etc/node-runner/install/Caddyfile /etc/caddy/Caddyfile"]
   - [bash, -lc, "systemctl reload caddy || systemctl restart caddy"]
 
-  # --- generate agent secrets once (bearer token + env-encryption key) ---
-  - [bash, -lc, "test -f /etc/node-runner/secrets.env || printf 'AGENT_TOKEN=%s\\nENV_ENCRYPTION_KEY=%s\\n' \"$(openssl rand -hex 32)\" \"$(openssl rand -hex 32)\" > /etc/node-runner/secrets.env"]
+  # --- generate agent secrets once (bearer token + env-encryption key + webhook secret) ---
+  # GitHub App creds (GITHUB_APP_ID / GITHUB_APP_SLUG + the .pem at
+  # /opt/node-runner/state/github-app.pem) are added by hand later — see docs/github-app.md.
+  # The WEBHOOK_SECRET generated here must be set as the GitHub App's webhook secret too.
+  - [bash, -lc, "test -f /etc/node-runner/secrets.env || printf 'AGENT_TOKEN=%s\\nENV_ENCRYPTION_KEY=%s\\nWEBHOOK_SECRET=%s\\n' \"$(openssl rand -hex 32)\" \"$(openssl rand -hex 32)\" \"$(openssl rand -hex 32)\" > /etc/node-runner/secrets.env"]
   - [bash, -lc, "chown root:deploy /etc/node-runner/secrets.env && chmod 640 /etc/node-runner/secrets.env"]
 
 %{ if floating_ip != "" ~}

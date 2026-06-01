@@ -12,6 +12,8 @@ export interface DashApp {
   id: string;
   name: string;
   repoUrl: string;
+  repoFullName?: string;
+  installationId?: number;
   branch: string;
   installCommand: string;
   buildCommand: string;
@@ -29,7 +31,9 @@ export interface DashApp {
 
 export interface CreateAppInput {
   name: string;
-  repoUrl: string;
+  repoUrl?: string;
+  repoFullName?: string;
+  installationId?: number;
   branch?: string;
   subdir?: string;
   installCommand?: string;
@@ -47,4 +51,26 @@ export interface WebhookInfo {
   path: string;
   secret: string;
   publicUrl: string | null;
+}
+
+export interface GithubInstallation {
+  id: number;
+  account: string;
+  accountType: string;
+}
+
+export interface GithubStatus {
+  configured: boolean;
+  installUrl: string | null;
+  installations: GithubInstallation[];
+}
+
+export interface GithubRepo {
+  fullName: string;
+  name: string;
+  owner: string;
+  private: boolean;
+  defaultBranch: string;
+  cloneUrl: string;
+  installationId: number;
 }

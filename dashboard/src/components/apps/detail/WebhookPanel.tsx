@@ -3,7 +3,27 @@ import { Section } from "@/components/ui/Section";
 import type { WebhookInfo } from "@/lib/types";
 import { InfoRow } from "./InfoRow";
 
-export function WebhookPanel({ webhook }: { webhook: WebhookInfo | null }) {
+interface Props {
+  webhook: WebhookInfo | null;
+  /** GitHub App–managed apps auto-deploy with no manual webhook setup. */
+  managed?: boolean;
+  branch?: string;
+  repoFullName?: string;
+}
+
+export function WebhookPanel({ webhook, managed, branch, repoFullName }: Props) {
+  if (managed) {
+    return (
+      <Section title="Auto-deploy">
+        <p className="text-[12px] text-[var(--c-muted)]">
+          Connected to{" "}
+          <span className="font-mono text-[var(--c-text)]">{repoFullName}</span> via the GitHub App.
+          Pushes to <span className="font-mono text-[var(--c-text)]">{branch}</span> deploy
+          automatically — no webhook setup needed.
+        </p>
+      </Section>
+    );
+  }
   if (!webhook) return null;
   return (
     <Section

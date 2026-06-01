@@ -4,6 +4,11 @@ Push to an app's branch → GitHub calls the agent's webhook → the agent pulls
 commit, rebuilds, and reloads the app. Any app whose **repo + branch** match the push is
 redeployed.
 
+> **Recommended: use the GitHub App** ([github-app.md](github-app.md)). Install it once and
+> repo listing, private-repo cloning, and webhooks are all handled automatically — no manual
+> webhook or deploy-key setup per repo. The steps below are the manual fallback for one-off
+> public repos.
+
 ## 1. Find your webhook URL + secret
 
 The agent generates and stores a webhook secret. Fetch both (token is in

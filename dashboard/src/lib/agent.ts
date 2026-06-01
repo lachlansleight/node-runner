@@ -1,5 +1,12 @@
 import "server-only";
-import type { CreateAppInput, DashApp, UpdateAppInput, WebhookInfo } from "./types";
+import type {
+  CreateAppInput,
+  DashApp,
+  GithubRepo,
+  GithubStatus,
+  UpdateAppInput,
+  WebhookInfo,
+} from "./types";
 
 /**
  * Server-only client for the node-runner agent API. The bearer token never
@@ -49,3 +56,9 @@ export const getLogs = (id: string, lines = 200) =>
   call<{ logs: string }>(`/apps/${id}/logs?lines=${lines}`);
 export const getWebhook = () => call<WebhookInfo>("/webhook");
 export const getDeployKey = (id: string) => call<{ publicKey: string }>(`/apps/${id}/deploy-key`);
+export const getGithubStatus = () => call<GithubStatus>("/github/status");
+export const listGithubRepos = () => call<{ repos: GithubRepo[] }>("/github/repos");
+export const listGithubBranches = (owner: string, repo: string, installationId: number) =>
+  call<{ branches: string[] }>(
+    `/github/repos/${owner}/${repo}/branches?installationId=${installationId}`,
+  );

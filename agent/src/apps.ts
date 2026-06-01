@@ -41,10 +41,33 @@ function assertDomains(domains: string[], ignoreId?: string): void {
   }
 }
 
+/** Resolve repo source: either a GitHub App repo (owner/repo + installation) or a manual URL. */
+function resolveRepo(input: { repoUrl?: string; repoFullName?: string; installationId?: number }): {
+  repoUrl: string;
+  repoFullName?: string;
+  installationId?: number;
+} {
+  if (input.repoFullName) {
+    if (!/^[\w.-]+\/[\w.-]+$/.test(input.repoFullName)) {
+      throw new ValidationError(`invalid repoFullName: ${input.repoFullName}`);
+    }
+    if (!Number.isInteger(input.installationId)) {
+      throw new ValidationError("installationId is required when repoFullName is set");
+    }
+    return {
+      repoUrl: `https://github.com/${input.repoFullName}.git`,
+      repoFullName: input.repoFullName,
+      installationId: input.installationId,
+    };
+  }
+  if (!input.repoUrl) throw new ValidationError("repoUrl or repoFullName is required");
+  return { repoUrl: input.repoUrl };
+}
+
 export function create(input: CreateAppInput): App {
   if (!input.name) throw new ValidationError("name is required");
-  if (!input.repoUrl) throw new ValidationError("repoUrl is required");
   if (!input.startCommand) throw new ValidationError("startCommand is required");
+  const repo = resolveRepo(input);
 
   const id = slugify(input.name);
   if (store.get(id)) throw new ValidationError(`an app named "${id}" already exists`);
@@ -57,7 +80,9 @@ export function create(input: CreateAppInput): App {
   const app: App = {
     id,
     name: input.name,
-    repoUrl: input.repoUrl,
+    repoUrl: repo.repoUrl,
+    repoFullName: repo.repoFullName,
+    installationId: repo.installationId,
     branch: input.branch ?? "main",
     installCommand: input.installCommand ?? "npm ci",
     buildCommand: input.buildCommand ?? "",
@@ -82,8 +107,16 @@ export async function update(id: string, patch: UpdateAppInput): Promise<App> {
   if (patch.port !== undefined) assertPort(patch.port, id);
   if (patch.domains !== undefined) assertDomains(patch.domains, id);
 
+  // Re-resolve the repo source only when the patch touches it.
+  const repo =
+    patch.repoUrl !== undefined || patch.repoFullName !== undefined
+      ? resolveRepo(patch)
+      : { repoUrl: app.repoUrl, repoFullName: app.repoFullName, installationId: app.installationId };
+
   Object.assign(app, {
-    repoUrl: patch.repoUrl ?? app.repoUrl,
+    repoUrl: repo.repoUrl,
+    repoFullName: repo.repoFullName,
+    installationId: repo.installationId,
     branch: patch.branch ?? app.branch,
     installCommand: patch.installCommand ?? app.installCommand,
     buildCommand: patch.buildCommand ?? app.buildCommand,

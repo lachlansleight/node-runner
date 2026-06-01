@@ -37,6 +37,20 @@ export const config = {
   keysDir: process.env.KEYS_DIR ?? "/opt/node-runner/state/keys",
 
   /**
+   * GitHub App credentials. When set, the agent can list installations/repos
+   * and mint short-lived installation tokens to clone private repos — no
+   * per-repo deploy keys or manual webhooks needed. The App's webhook secret is
+   * the same WEBHOOK_SECRET above.
+   */
+  githubAppId: process.env.GITHUB_APP_ID ?? "",
+  /** App URL slug (github.com/apps/<slug>), used to build the install URL. */
+  githubAppSlug: process.env.GITHUB_APP_SLUG ?? "",
+  /** PEM private key, inline or via a file path (file takes precedence). */
+  githubAppPrivateKey: process.env.GITHUB_APP_PRIVATE_KEY ?? "",
+  githubAppPrivateKeyFile:
+    process.env.GITHUB_APP_PRIVATE_KEY_FILE ?? "/opt/node-runner/state/github-app.pem",
+
+  /**
    * Public IP of the box. When set, Caddy exposes the webhook over plain HTTP at
    * http://<publicIp>/webhooks/github so GitHub can reach it without a domain.
    */

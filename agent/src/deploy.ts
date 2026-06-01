@@ -4,7 +4,7 @@ import * as caddy from "./caddy";
 import { config } from "./config";
 import { run } from "./exec";
 import { resolveNodeBinDir } from "./fnm";
-import { ensureDeployKey, gitEnv, isSshRepo } from "./gitauth";
+import { gitAuthEnv } from "./gitauth";
 import { appDir, appWorkdir } from "./paths";
 import * as pm2 from "./pm2";
 import * as store from "./store";
@@ -35,8 +35,7 @@ async function syncRepo(app: App): Promise<string> {
   const branch = gitArg(app.branch);
   const repo = gitArg(app.repoUrl);
 
-  if (isSshRepo(app.repoUrl)) await ensureDeployKey(app.id);
-  const env = gitEnv(app);
+  const env = await gitAuthEnv(app);
 
   if (!existsSync(join(dir, ".git"))) {
     mkdirSync(config.appsRoot, { recursive: true });

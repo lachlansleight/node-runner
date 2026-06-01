@@ -17,6 +17,10 @@ export interface App {
   id: string;
   name: string;
   repoUrl: string;
+  /** "owner/repo" when the app is managed by the GitHub App; absent for manual-URL apps. */
+  repoFullName?: string;
+  /** GitHub App installation that grants access to repoFullName. */
+  installationId?: number;
   branch: string;
   /** Defaults to "npm ci". Set empty string to skip. */
   installCommand: string;
@@ -42,7 +46,10 @@ export interface App {
 
 export interface CreateAppInput {
   name: string;
-  repoUrl: string;
+  /** Either repoUrl (manual) or repoFullName + installationId (GitHub App) must be provided. */
+  repoUrl?: string;
+  repoFullName?: string;
+  installationId?: number;
   branch?: string;
   installCommand?: string;
   buildCommand?: string;

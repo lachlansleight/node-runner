@@ -26,15 +26,19 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
     notFound();
   }
 
+  const managed = Boolean(app.repoFullName);
+
   const [logsResult, webhook] = await Promise.all([
     getLogs(id).catch(() => ({ logs: "" })),
-    getWebhook().catch(() => null),
+    managed ? Promise.resolve(null) : getWebhook().catch(() => null),
   ]);
-  const deployKey = isSshRepo(app.repoUrl)
-    ? await getDeployKey(id)
-        .then((r) => r.publicKey)
-        .catch(() => null)
-    : null;
+  // Deploy keys only apply to manual SSH repos; managed apps use installation tokens.
+  const deployKey =
+    !managed && isSshRepo(app.repoUrl)
+      ? await getDeployKey(id)
+          .then((r) => r.publicKey)
+          .catch(() => null)
+      : null;
 
   return (
     <div className="flex flex-col gap-[16px]">
@@ -44,7 +48,12 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
       <DomainsPanel app={app} />
       <EnvPanel app={app} />
       {deployKey && <DeployKeyPanel publicKey={deployKey} />}
-      <WebhookPanel webhook={webhook} />
+      <WebhookPanel
+        webhook={webhook}
+        managed={managed}
+        branch={app.branch}
+        repoFullName={app.repoFullName}
+      />
       <LogsPanel logs={logsResult.logs} />
     </div>
   );

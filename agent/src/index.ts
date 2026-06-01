@@ -8,6 +8,7 @@ import * as pm2 from "./pm2";
 import * as store from "./store";
 import type { CreateAppInput, UpdateAppInput } from "./types";
 import * as gitauth from "./gitauth";
+import * as github from "./github";
 import * as webhook from "./webhook";
 
 type Handler = (ctx: Ctx) => Promise<void> | void;
@@ -155,6 +156,32 @@ route("GET", "/apps/:id/logs", async ({ res, params, url }) => {
 route("GET", "/apps/:id/deploy-key", async ({ res, params }) => {
   if (!store.get(params.id)) throw new HttpError(404, "app not found");
   send(res, 200, { publicKey: await gitauth.ensureDeployKey(params.id) });
+});
+
+// --- GitHub App ------------------------------------------------------------
+
+// Whether the App is configured + which accounts have installed it.
+route("GET", "/github/status", async ({ res }) => {
+  if (!github.configured()) {
+    send(res, 200, { configured: false, installUrl: github.installUrl(), installations: [] });
+    return;
+  }
+  const installations = await github.listInstallations();
+  send(res, 200, { configured: true, installUrl: github.installUrl(), installations });
+});
+
+// Repos the App can access, for the create-app picker.
+route("GET", "/github/repos", async ({ res }) => {
+  if (!github.configured()) throw new HttpError(400, "GitHub App is not configured");
+  send(res, 200, { repos: await github.listRepos() });
+});
+
+// Branches of a repo, for the create-app picker.
+route("GET", "/github/repos/:owner/:repo/branches", async ({ res, params, url }) => {
+  if (!github.configured()) throw new HttpError(400, "GitHub App is not configured");
+  const installationId = Number(url.searchParams.get("installationId"));
+  if (!Number.isInteger(installationId)) throw new HttpError(400, "installationId is required");
+  send(res, 200, { branches: await github.listBranches(installationId, params.owner, params.repo) });
 });
 
 // Webhook setup info (the secret + the path to register in GitHub).
