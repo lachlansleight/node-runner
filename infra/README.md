@@ -20,8 +20,13 @@ auto-installs everything it needs (Node, PM2, fnm, Caddy, the agent). No console
 
 ## One-time setup
 
-1. **SSH key** — already generated at `~/.ssh/node-runner` (public key
-   `~/.ssh/node-runner.pub`). The Terraform points at the `.pub` by default.
+1. **SSH key** — Terraform points at `~/.ssh/node-runner.pub` by default. If you don't have
+   one yet, generate it:
+   ```sh
+   ssh-keygen -t ed25519 -f ~/.ssh/node-runner -C node-runner
+   ```
+   (Override the path with the `ssh_public_key_path` variable in `terraform.tfvars` if you
+   keep it elsewhere.)
 
 2. **Hetzner API token** — Hetzner Cloud Console → your project → Security →
    API Tokens → *Generate API Token* (Read & Write).

@@ -13,6 +13,9 @@ shipping the compiled `dist/`.
 
 For each app the agent:
 1. Clones the repo and hard-resets to the tip of the chosen branch (`/srv/apps/<id>`).
+   Private repos authenticate one of two ways: a short-lived **GitHub App installation
+   token** (for apps created from the repo picker), or a per-app **deploy key** (for apps
+   created from a manual SSH URL).
 2. Resolves the Node version (system default, or a per-app version via **fnm**).
 3. Runs the install command (`npm ci` by default), then the build command.
 4. Writes a PM2 ecosystem file and `pm2 startOrReload`s the app with `PORT` + env injected.
@@ -37,8 +40,10 @@ the service (replacing the Phase 0 stub).
 
 ## API
 
-All `/apps*` routes require `Authorization: Bearer <AGENT_TOKEN>` (the token in
-`/etc/node-runner/secrets.env`). `/health` and `/caddy/ask` are open (loopback-only).
+All routes except `/health`, `/caddy/ask`, and `/webhooks/github` require
+`Authorization: Bearer <AGENT_TOKEN>` (the token in `/etc/node-runner/secrets.env`).
+`/health` and `/caddy/ask` are open (loopback-only); `/webhooks/github` is open but
+authenticated by GitHub's HMAC signature.
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -51,6 +56,12 @@ All `/apps*` routes require `Authorization: Bearer <AGENT_TOKEN>` (the token in
 | POST   | `/apps/:id/deploy` | Clone/build/restart |
 | POST   | `/apps/:id/stop` · `/start` | PM2 stop/start |
 | GET    | `/apps/:id/logs?lines=200` | Recent logs |
+| GET    | `/apps/:id/deploy-key` | Per-app deploy key (manual SSH private repos) |
+| GET    | `/webhook` | Webhook URL + secret (manual-webhook setup info) |
+| GET    | `/github/status` | Whether the GitHub App is configured + its installations |
+| GET    | `/github/repos` | Repos the GitHub App can access (for the create-app picker) |
+| GET    | `/github/repos/:owner/:repo/branches` | Branches of a repo (`?installationId=`) |
+| POST   | `/webhooks/github` | GitHub push webhook → auto-deploy matching apps |
 
 ### Create + deploy example
 
@@ -80,22 +91,34 @@ curl -s -X POST localhost:8080/apps/hello/deploy -H "Authorization: Bearer $TOKE
 Then point a DNS A record for `hello.example.com` at the server, and the first HTTPS
 request provisions a certificate automatically.
 
+Apps created from the GitHub App repo picker (via the dashboard) instead pass
+`repoFullName` + `installationId` rather than `repoUrl`; the agent derives the clone URL
+and uses an installation token. See [`docs/github-app.md`](../docs/github-app.md).
+
 ## Config (env vars)
 
-Read from `/etc/node-runner/secrets.env` and `/etc/node-runner/agent.env`:
+Read from `/etc/node-runner/secrets.env` (and optionally `/etc/node-runner/agent.env`):
 
 | Var | Default | Notes |
 |-----|---------|-------|
 | `AGENT_TOKEN` | — | Bearer token (generated at provision) |
 | `ENV_ENCRYPTION_KEY` | — | 64 hex chars (generated at provision) |
-| `CONTROL_DOMAIN` | _empty_ | Set in `agent.env` once you have DNS |
+| `CONTROL_DOMAIN` | _empty_ | Management hostname; set once you have DNS |
+| `WEBHOOK_SECRET` | _generated_ | GitHub HMAC secret. For a GitHub App, set this to the App's webhook secret |
+| `GITHUB_APP_ID` | _empty_ | GitHub App ID (enables the repo picker + install tokens) |
+| `GITHUB_APP_SLUG` | _empty_ | App slug (`github.com/apps/<slug>`); builds the install URL |
+| `GITHUB_APP_PRIVATE_KEY_FILE` | `/opt/node-runner/state/github-app.pem` | PEM path; takes precedence over the inline var |
+| `GITHUB_APP_PRIVATE_KEY` | _empty_ | PEM inline (alternative to the file) |
 | `PORT` | `8080` | Agent listen port (loopback) |
 | `APPS_ROOT` | `/srv/apps` | |
 | `STATE_FILE` | `/opt/node-runner/state/apps.json` | |
 | `CADDYFILE_PATH` | `/etc/caddy/Caddyfile` | |
 | `FNM_DIR` | `/opt/fnm` | |
+| `KEYS_DIR` | `/opt/node-runner/state/keys` | Per-app deploy keys (manual SSH repos) |
+| `PUBLIC_IP` | _empty_ | If set (no domain yet), exposes the webhook over `http://<ip>` |
 
-## Not yet (later phases)
+## Connecting GitHub
 
-- **Phase 2:** GitHub webhooks → auto-deploy on push; private-repo auth (deploy keys).
-- **Phase 3:** the Next.js dashboard that calls this API.
+For the repo picker and push-to-deploy, set up a GitHub App — see
+[`docs/github-app.md`](../docs/github-app.md). The manual per-repo webhook + deploy-key
+fallback (for one-off public repos) is in [`docs/auto-deploy.md`](../docs/auto-deploy.md).

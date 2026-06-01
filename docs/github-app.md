@@ -12,9 +12,9 @@ GitHub → **Settings → Developer settings → GitHub Apps → New GitHub App*
 | Field | Value |
 |---|---|
 | **GitHub App name** | anything, e.g. `node-runner-deploy` (the slug is derived from this) |
-| **Homepage URL** | `https://noderunner.of.glass` (or your dashboard URL) |
+| **Homepage URL** | your dashboard URL, e.g. `https://control.<yourdomain>` |
 | **Webhook → Active** | checked |
-| **Webhook URL** | `https://noderunner.of.glass/webhooks/github` |
+| **Webhook URL** | `https://control.<yourdomain>/webhooks/github` |
 | **Webhook secret** | a fresh secret: `openssl rand -hex 32` (save it — you'll reuse it on the box) |
 | **Callback URL** | leave blank |
 | **Request user authorization (OAuth) during installation** | unchecked |
@@ -36,6 +36,11 @@ Create the app. Then on its page:
 
 On the App page → **Install App** → choose your account → select **All repositories** (or
 just the ones you want). This is the "authenticate once" step.
+
+> **Org repos:** to use repos owned by an organization, set **Where can this app be
+> installed?** to *Any account* when creating the App (step 1), then install it on the org
+> as well (an org owner may need to approve). The agent aggregates repos across every
+> installation, so org and personal repos both show up in the picker.
 
 ## 3. Put the credentials on the box
 
@@ -81,7 +86,7 @@ every push to that branch deploys automatically.
 ## How it works
 
 - The App has a **single webhook** (configured once, above). GitHub delivers `push` events
-  for every installed repo to `https://noderunner.of.glass/webhooks/github`. The agent
+  for every installed repo to `https://control.<yourdomain>/webhooks/github`. The agent
   matches each push to apps by repo + branch and redeploys them — same matching logic as
   the manual webhook, just no per-repo setup.
 - For private repos, the agent mints a short-lived **installation access token** per deploy
