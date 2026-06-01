@@ -24,6 +24,8 @@ export interface App {
   buildCommand: string;
   /** e.g. "node dist/server.js" or "npm run start". Required. */
   startCommand: string;
+  /** Optional path within the repo to treat as the app root (monorepo support). */
+  subdir: string;
   /** Internal port the app binds on 127.0.0.1. Public traffic always arrives via Caddy on 443. */
   port: number;
   /** Hostnames Caddy routes to this app (TLS issued on-demand). */
@@ -45,6 +47,7 @@ export interface CreateAppInput {
   installCommand?: string;
   buildCommand?: string;
   startCommand: string;
+  subdir?: string;
   port: number;
   domains?: string[];
   nodeVersion?: string;

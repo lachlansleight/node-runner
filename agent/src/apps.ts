@@ -22,6 +22,15 @@ function assertPort(port: number, ignoreId?: string): void {
   if (clash) throw new ValidationError(`port ${port} is already used by app "${clash.id}"`);
 }
 
+function normalizeSubdir(subdir: string | undefined): string {
+  const s = (subdir ?? "").replace(/^\/+|\/+$/g, "").trim();
+  if (!s) return "";
+  if (!/^[\w./-]+$/.test(s) || s.split("/").includes("..")) {
+    throw new ValidationError(`invalid subdir: ${subdir}`);
+  }
+  return s;
+}
+
 function assertDomains(domains: string[], ignoreId?: string): void {
   for (const d of domains) {
     if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(d)) {
@@ -53,6 +62,7 @@ export function create(input: CreateAppInput): App {
     installCommand: input.installCommand ?? "npm ci",
     buildCommand: input.buildCommand ?? "",
     startCommand: input.startCommand,
+    subdir: normalizeSubdir(input.subdir),
     port: input.port,
     domains,
     nodeVersion: input.nodeVersion,
@@ -78,6 +88,7 @@ export async function update(id: string, patch: UpdateAppInput): Promise<App> {
     installCommand: patch.installCommand ?? app.installCommand,
     buildCommand: patch.buildCommand ?? app.buildCommand,
     startCommand: patch.startCommand ?? app.startCommand,
+    subdir: patch.subdir !== undefined ? normalizeSubdir(patch.subdir) : app.subdir,
     port: patch.port ?? app.port,
     domains: patch.domains ?? app.domains,
     nodeVersion: patch.nodeVersion ?? app.nodeVersion,

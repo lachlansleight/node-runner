@@ -4,7 +4,7 @@ import * as caddy from "./caddy";
 import { config } from "./config";
 import { run } from "./exec";
 import { resolveNodeBinDir } from "./fnm";
-import { appDir } from "./paths";
+import { appDir, appWorkdir } from "./paths";
 import * as pm2 from "./pm2";
 import * as store from "./store";
 import type { App } from "./types";
@@ -59,7 +59,7 @@ export async function deploy(id: string): Promise<App> {
 
     try {
       const commit = await syncRepo(app);
-      const dir = appDir(app.id);
+      const workdir = appWorkdir(app);
       const nodeBinDir = await resolveNodeBinDir(app.nodeVersion);
       const buildEnv: Record<string, string> = {
         ...app.env,
@@ -67,8 +67,8 @@ export async function deploy(id: string): Promise<App> {
         PATH: `${nodeBinDir}:/usr/local/bin:/usr/bin:/bin`,
       };
 
-      if (app.installCommand) await run(app.installCommand, { cwd: dir, env: buildEnv });
-      if (app.buildCommand) await run(app.buildCommand, { cwd: dir, env: buildEnv });
+      if (app.installCommand) await run(app.installCommand, { cwd: workdir, env: buildEnv });
+      if (app.buildCommand) await run(app.buildCommand, { cwd: workdir, env: buildEnv });
 
       await pm2.startOrReload(app, nodeBinDir);
       await caddy.apply(store.list());

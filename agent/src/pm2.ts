@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { run } from "./exec";
 import type { App } from "./types";
-import { appDir } from "./paths";
+import { appWorkdir } from "./paths";
 
 /**
  * Each app runs under PM2 via a generated wrapper script + ecosystem file.
@@ -11,7 +11,7 @@ import { appDir } from "./paths";
  * come back on reboot.
  */
 export async function startOrReload(app: App, nodeBinDir: string): Promise<void> {
-  const dir = appDir(app.id);
+  const dir = appWorkdir(app);
 
   const wrapper = join(dir, ".node-runner-start.sh");
   writeFileSync(wrapper, `#!/usr/bin/env bash\nset -e\nexec ${app.startCommand}\n`, { mode: 0o755 });
