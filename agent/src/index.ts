@@ -7,6 +7,8 @@ import * as deploy from "./deploy";
 import * as pm2 from "./pm2";
 import * as store from "./store";
 import type { CreateAppInput, UpdateAppInput } from "./types";
+import * as gitauth from "./gitauth";
+import * as webhook from "./webhook";
 
 type Handler = (ctx: Ctx) => Promise<void> | void;
 interface Ctx {
@@ -14,6 +16,9 @@ interface Ctx {
   res: ServerResponse;
   url: URL;
   params: Record<string, string>;
+  /** Raw request body (cached). */
+  raw: () => Promise<string>;
+  /** Parsed JSON body (cached). */
   body: () => Promise<unknown>;
 }
 
@@ -23,11 +28,14 @@ function send(res: ServerResponse, status: number, body: unknown): void {
   res.end(payload);
 }
 
-async function readJson(req: IncomingMessage): Promise<unknown> {
+async function readRaw(req: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const c of req) chunks.push(c as Buffer);
-  const raw = Buffer.concat(chunks).toString("utf8").trim();
-  if (!raw) return {};
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+function parseJson(raw: string): unknown {
+  if (!raw.trim()) return {};
   try {
     return JSON.parse(raw);
   } catch {
@@ -143,6 +151,51 @@ route("GET", "/apps/:id/logs", async ({ res, params, url }) => {
   send(res, 200, { logs: await pm2.logs(params.id, lines) });
 });
 
+// Per-app deploy key (for private repos). Add the returned key to the repo's Deploy Keys.
+route("GET", "/apps/:id/deploy-key", async ({ res, params }) => {
+  if (!store.get(params.id)) throw new HttpError(404, "app not found");
+  send(res, 200, { publicKey: await gitauth.ensureDeployKey(params.id) });
+});
+
+// Webhook setup info (the secret + the path to register in GitHub).
+route("GET", "/webhook", ({ res }) => {
+  send(res, 200, {
+    path: "/webhooks/github",
+    secret: webhook.webhookSecret(),
+    contentType: "application/json",
+    publicUrl: config.controlDomain
+      ? `https://${config.controlDomain}/webhooks/github`
+      : config.publicIp
+        ? `http://${config.publicIp}/webhooks/github`
+        : null,
+  });
+});
+
+// GitHub push webhook. Open route, but authenticated by HMAC signature.
+route(
+  "POST",
+  "/webhooks/github",
+  async ({ req, res, raw }) => {
+    const rawBody = await raw();
+    if (!webhook.verifySignature(rawBody, req.headers["x-hub-signature-256"] as string | undefined)) {
+      send(res, 401, { error: "invalid signature" });
+      return;
+    }
+    const event = (req.headers["x-github-event"] as string | undefined) ?? "";
+    if (event === "ping") {
+      send(res, 200, { ok: true, pong: true });
+      return;
+    }
+    if (event !== "push") {
+      send(res, 202, { ignored: event });
+      return;
+    }
+    const triggered = webhook.triggerPush(parseJson(rawBody) as Parameters<typeof webhook.triggerPush>[0]);
+    send(res, 202, { triggered });
+  },
+  true,
+);
+
 // --- dispatch ---------------------------------------------------------------
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -162,18 +215,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   const params: Record<string, string> = {};
   match.keys.forEach((k, i) => (params[k] = decodeURIComponent(m[i + 1])));
 
-  let cached: unknown;
-  let read = false;
-  const body = async () => {
-    if (!read) {
-      cached = await readJson(req);
-      read = true;
-    }
-    return cached;
+  let rawCache: string | undefined;
+  const raw = async () => {
+    if (rawCache === undefined) rawCache = await readRaw(req);
+    return rawCache;
   };
+  const body = async () => parseJson(await raw());
 
   try {
-    await match.handler({ req, res, url, params, body });
+    await match.handler({ req, res, url, params, raw, body });
   } catch (err) {
     if (err instanceof HttpError) {
       send(res, err.status, { error: err.message });

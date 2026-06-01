@@ -4,6 +4,7 @@ import * as caddy from "./caddy";
 import { config } from "./config";
 import { run } from "./exec";
 import { resolveNodeBinDir } from "./fnm";
+import { ensureDeployKey, gitEnv, isSshRepo } from "./gitauth";
 import { appDir, appWorkdir } from "./paths";
 import * as pm2 from "./pm2";
 import * as store from "./store";
@@ -34,13 +35,16 @@ async function syncRepo(app: App): Promise<string> {
   const branch = gitArg(app.branch);
   const repo = gitArg(app.repoUrl);
 
+  if (isSshRepo(app.repoUrl)) await ensureDeployKey(app.id);
+  const env = gitEnv(app);
+
   if (!existsSync(join(dir, ".git"))) {
     mkdirSync(config.appsRoot, { recursive: true });
-    await run(`git clone --branch ${branch} --single-branch ${repo} ${dir}`);
+    await run(`git clone --branch ${branch} --single-branch ${repo} ${dir}`, { env });
   } else {
-    await run(`git fetch origin ${branch}`, { cwd: dir });
-    await run(`git checkout ${branch}`, { cwd: dir });
-    await run(`git reset --hard origin/${branch}`, { cwd: dir });
+    await run(`git fetch origin ${branch}`, { cwd: dir, env });
+    await run(`git checkout ${branch}`, { cwd: dir, env });
+    await run(`git reset --hard origin/${branch}`, { cwd: dir, env });
   }
 
   const res = await run("git rev-parse --short HEAD", { cwd: dir });

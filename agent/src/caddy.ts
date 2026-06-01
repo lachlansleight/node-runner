@@ -29,6 +29,21 @@ export function renderCaddyfile(apps: App[]): string {
     blocks.push([`${config.controlDomain} {`, `  reverse_proxy 127.0.0.1:${config.port}`, "}"].join("\n"));
   }
 
+  // Expose ONLY the webhook over plain HTTP on the bare IP, so GitHub can reach
+  // it without a domain. Scoped to the IP host so it can't shadow app domains.
+  if (config.publicIp) {
+    blocks.push(
+      [
+        `http://${config.publicIp} {`,
+        "  handle /webhooks/* {",
+        `    reverse_proxy 127.0.0.1:${config.port}`,
+        "  }",
+        "  respond 404",
+        "}",
+      ].join("\n"),
+    );
+  }
+
   for (const app of apps) {
     const domains = app.domains.filter(Boolean);
     if (domains.length === 0) continue;

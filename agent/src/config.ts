@@ -28,6 +28,19 @@ export const config = {
 
   /** fnm data dir (per-app Node versions). */
   fnmDir: process.env.FNM_DIR ?? "/opt/fnm",
+
+  /** GitHub webhook HMAC secret. If empty, the agent generates + persists one. */
+  webhookSecret: process.env.WEBHOOK_SECRET ?? "",
+  webhookSecretFile: process.env.WEBHOOK_SECRET_FILE ?? "/opt/node-runner/state/webhook.secret",
+
+  /** Per-app deploy keys for private repos live here. */
+  keysDir: process.env.KEYS_DIR ?? "/opt/node-runner/state/keys",
+
+  /**
+   * Public IP of the box. When set, Caddy exposes the webhook over plain HTTP at
+   * http://<publicIp>/webhooks/github so GitHub can reach it without a domain.
+   */
+  publicIp: process.env.PUBLIC_IP ?? "",
 } as const;
 
 export function assertConfig(): void {
