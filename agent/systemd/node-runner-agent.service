@@ -1,0 +1,20 @@
+[Unit]
+Description=node-runner agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/opt/node-runner/app
+# Generated secrets (AGENT_TOKEN, ENV_ENCRYPTION_KEY) from cloud-init:
+EnvironmentFile=-/etc/node-runner/secrets.env
+# Optional extra config (e.g. CONTROL_DOMAIN=control.example.com):
+EnvironmentFile=-/etc/node-runner/agent.env
+Environment=PORT=8080
+ExecStart=/usr/bin/node /opt/node-runner/app/dist/index.js
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

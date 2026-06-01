@@ -1,0 +1,19 @@
+{
+  "name": "node-runner-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "node-runner agent — runs on the box, manages apps (clone/build/PM2/Caddy).",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  }
+}

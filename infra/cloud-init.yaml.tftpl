@@ -1,0 +1,142 @@
+#cloud-config
+# node-runner box bootstrap. Runs once, unattended, on first boot.
+package_update: true
+package_upgrade: false
+
+write_files:
+  # --- Base Caddy config: admin API + on-demand TLS gate + (optional) control host ---
+  - path: /etc/node-runner/install/Caddyfile
+    permissions: "0644"
+    content: |
+      {
+        admin localhost:2019
+        on_demand_tls {
+          # Caddy asks the agent before issuing a cert for any hostname.
+          # The agent approves only domains belonging to a registered app.
+          ask http://127.0.0.1:8080/caddy/ask
+        }
+      }
+%{ if control_domain != "" ~}
+      ${control_domain} {
+        reverse_proxy 127.0.0.1:8080
+      }
+%{ endif ~}
+
+  # --- PHASE 0 PLACEHOLDER AGENT ---
+  # Zero-dependency stub that proves the Caddy <-> agent <-> TLS wiring works.
+  # Replaced by the real agent (clone/build/PM2/Caddy-admin) in Phase 1.
+  - path: /opt/node-runner/agent-stub.js
+    permissions: "0755"
+    content: |
+      const http = require("http");
+      const CONTROL_DOMAIN = process.env.CONTROL_DOMAIN || "";
+      const server = http.createServer((req, res) => {
+        const url = new URL(req.url, "http://localhost");
+        if (url.pathname === "/health") {
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: true, phase: 0, stub: true }));
+          return;
+        }
+        if (url.pathname === "/caddy/ask") {
+          const domain = url.searchParams.get("domain") || "";
+          // Phase 0: no apps registered yet, so only the control domain is allowed.
+          const allow = domain !== "" && domain === CONTROL_DOMAIN;
+          res.writeHead(allow ? 200 : 403);
+          res.end(allow ? "ok" : "unknown domain");
+          return;
+        }
+        res.writeHead(404);
+        res.end("not found");
+      });
+      server.listen(8080, "127.0.0.1", () => console.log("stub agent listening on 127.0.0.1:8080"));
+
+  # --- systemd unit for the agent ---
+  - path: /etc/systemd/system/node-runner-agent.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=node-runner agent
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      User=deploy
+      EnvironmentFile=-/etc/node-runner/secrets.env
+      Environment=CONTROL_DOMAIN=${control_domain}
+      Environment=PORT=8080
+      ExecStart=/usr/bin/node /opt/node-runner/agent-stub.js
+      Restart=always
+      RestartSec=2
+
+      [Install]
+      WantedBy=multi-user.target
+
+  # --- handy status command ---
+  - path: /usr/local/bin/node-runner-status
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      echo "== node $(node -v 2>/dev/null) | npm v$(npm -v 2>/dev/null) | fnm $(fnm --version 2>/dev/null) =="
+      echo "== caddy:  $(systemctl is-active caddy) =="
+      echo "== agent:  $(systemctl is-active node-runner-agent) =="
+      echo "== pm2 =="; sudo -u deploy bash -lc 'pm2 ls' 2>/dev/null || echo "  (no pm2 processes yet)"
+      echo "== agent health =="; curl -s http://127.0.0.1:8080/health && echo || echo "  no response"
+
+%{ if floating_ip != "" ~}
+  # --- attach the Floating IP to the network interface so traffic is accepted ---
+  - path: /etc/netplan/60-floating-ip.yaml
+    permissions: "0600"
+    content: |
+      network:
+        version: 2
+        ethernets:
+          eth0:
+            addresses:
+              - ${floating_ip}/32
+%{ endif ~}
+
+runcmd:
+  # --- swap (protects running apps from OOM during on-box builds) ---
+  - [bash, -lc, "test -f /swapfile || (fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab)"]
+
+  # --- deploy user + working directories ---
+  - [bash, -lc, "id deploy >/dev/null 2>&1 || useradd -m -s /bin/bash deploy"]
+  - [bash, -lc, "mkdir -p /srv/apps /opt/node-runner /etc/node-runner /opt/fnm && chown -R deploy:deploy /srv/apps /opt/node-runner /opt/fnm"]
+
+  # --- base packages ---
+  - [bash, -lc, "apt-get install -y curl git ca-certificates gnupg unzip openssl debian-keyring debian-archive-keyring apt-transport-https"]
+
+  # --- Node.js (system default) via NodeSource ---
+  - [bash, -lc, "curl -fsSL https://deb.nodesource.com/setup_${node_version}.x | bash -"]
+  - [bash, -lc, "apt-get install -y nodejs"]
+
+  # --- PM2, running as the deploy user and surviving reboots ---
+  - [bash, -lc, "npm install -g pm2"]
+  - [bash, -lc, "pm2 startup systemd -u deploy --hp /home/deploy"]
+  - [bash, -lc, "sudo -u deploy bash -lc 'pm2 save || true'"]
+
+  # --- fnm: enables per-app Node versions (the agent uses this in Phase 1) ---
+  - [bash, -lc, "curl -fsSL https://github.com/Schniz/fnm/releases/latest/download/fnm-linux.zip -o /tmp/fnm.zip && unzip -o /tmp/fnm.zip -d /tmp/fnm && install -m 0755 /tmp/fnm/fnm /usr/local/bin/fnm"]
+  - [bash, -lc, "echo 'export FNM_DIR=/opt/fnm' > /etc/profile.d/fnm.sh"]
+
+  # --- Caddy via its official apt repo ---
+  - [bash, -lc, "curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg"]
+  - [bash, -lc, "curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list"]
+  - [bash, -lc, "apt-get update && apt-get install -y caddy"]
+  - [bash, -lc, "install -o caddy -g caddy -m 0644 /etc/node-runner/install/Caddyfile /etc/caddy/Caddyfile"]
+  - [bash, -lc, "systemctl reload caddy || systemctl restart caddy"]
+
+  # --- generate agent secrets once (bearer token + env-encryption key) ---
+  - [bash, -lc, "test -f /etc/node-runner/secrets.env || printf 'AGENT_TOKEN=%s\\nENV_ENCRYPTION_KEY=%s\\n' \"$(openssl rand -hex 32)\" \"$(openssl rand -hex 32)\" > /etc/node-runner/secrets.env"]
+  - [bash, -lc, "chown root:deploy /etc/node-runner/secrets.env && chmod 640 /etc/node-runner/secrets.env"]
+
+%{ if floating_ip != "" ~}
+  # --- bring up the Floating IP ---
+  - [bash, -lc, "netplan apply || true"]
+%{ endif ~}
+
+  # --- start the (stub) agent ---
+  - [bash, -lc, "systemctl daemon-reload && systemctl enable --now node-runner-agent"]
+
+  - [bash, -lc, "echo \"node-runner bootstrap finished at $(date -u)\" > /opt/node-runner/.ready"]
