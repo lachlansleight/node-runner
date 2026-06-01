@@ -3,7 +3,18 @@
 package_update: true
 package_upgrade: false
 
+# SSH is exposed to the internet (no IP filtering), so it must be key-only.
+ssh_pwauth: false
+
 write_files:
+  # --- harden SSH: key-only, root via key only ---
+  - path: /etc/ssh/sshd_config.d/99-node-runner.conf
+    permissions: "0644"
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin prohibit-password
+
   # --- Base Caddy config: admin API + on-demand TLS gate + (optional) control host ---
   - path: /etc/node-runner/install/Caddyfile
     permissions: "0644"
@@ -97,6 +108,9 @@ write_files:
 %{ endif ~}
 
 runcmd:
+  # --- apply SSH hardening drop-in ---
+  - [bash, -lc, "sshd -t && (systemctl reload ssh || systemctl reload sshd)"]
+
   # --- swap (protects running apps from OOM during on-box builds) ---
   - [bash, -lc, "test -f /swapfile || (fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab)"]
 

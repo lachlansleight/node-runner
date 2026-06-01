@@ -4,11 +4,6 @@ variable "hcloud_token" {
   sensitive   = true
 }
 
-variable "admin_ip" {
-  description = "Your public IPv4, used to lock SSH (port 22) to you only. Find it at https://ifconfig.me . No /32 suffix."
-  type        = string
-}
-
 variable "ssh_public_key_path" {
   description = "Path to the SSH public key allowed to log into the server."
   type        = string

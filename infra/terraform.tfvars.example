@@ -4,10 +4,6 @@
 # Hetzner Cloud API token (Console -> Security -> API Tokens, Read & Write).
 hcloud_token = "PASTE_YOUR_HETZNER_TOKEN_HERE"
 
-# Your current public IPv4 so SSH is locked to you. Get it from https://ifconfig.me
-# (No /32 — Terraform adds it. If your home IP changes, update this and re-apply.)
-admin_ip = "1.2.3.4"
-
 # ---- Optional overrides (defaults shown) ----
 # server_type     = "cpx31"   # 4 vCPU / 8 GB / 160 GB NVMe. Bump to cpx41 for 16 GB.
 # location        = "fsn1"     # Falkenstein, DE. Alternatives: nbg1, hel1.

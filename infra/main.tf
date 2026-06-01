@@ -14,12 +14,13 @@ resource "hcloud_ssh_key" "admin" {
 resource "hcloud_firewall" "main" {
   name = "${var.server_name}-fw"
 
-  # SSH — locked to your IP only.
+  # SSH — open to the world (no IP filtering, since the admin has a dynamic IP).
+  # Safe because the box is key-only: password authentication is disabled (see cloud-init).
   rule {
     direction  = "in"
     protocol   = "tcp"
     port       = "22"
-    source_ips = ["${var.admin_ip}/32"]
+    source_ips = ["0.0.0.0/0", "::/0"]
   }
 
   # HTTP — public (Caddy serves + redirects to HTTPS, and ACME HTTP challenge).
@@ -66,6 +67,13 @@ resource "hcloud_server" "main" {
   public_net {
     ipv4_enabled = true
     ipv6_enabled = true
+  }
+
+  lifecycle {
+    # cloud-init (user_data) runs only on first boot. Editing it should refine
+    # future rebuilds, never destroy/recreate the running box. To deliberately
+    # re-bootstrap, use: terraform apply -replace=hcloud_server.main
+    ignore_changes = [user_data]
   }
 }
 

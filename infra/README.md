@@ -6,7 +6,8 @@ auto-installs everything it needs (Node, PM2, fnm, Caddy, the agent). No console
 ## What gets created
 
 - A Hetzner **CPX31** server (4 vCPU / 8 GB / 160 GB NVMe) in **Falkenstein**, Ubuntu 24.04.
-- A **firewall**: SSH open to *your IP only*; ports 80/443 open to the world; ICMP.
+- A **firewall**: ports 22/80/443 open to the world; ICMP. SSH is safe to expose
+  because the box is key-only (password auth disabled).
 - A **Floating IP** — a stable address you point DNS at, so you can rebuild the box later
   without touching DNS.
 - On first boot, cloud-init installs and configures:
@@ -29,7 +30,7 @@ auto-installs everything it needs (Node, PM2, fnm, Caddy, the agent). No console
    ```sh
    cd infra
    cp terraform.tfvars.example terraform.tfvars
-   # edit terraform.tfvars: paste the token, set admin_ip to your public IPv4
+   # edit terraform.tfvars: paste the Hetzner token
    ```
 
 ## Deploy
