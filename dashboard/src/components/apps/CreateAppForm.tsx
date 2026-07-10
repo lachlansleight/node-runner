@@ -33,13 +33,29 @@ interface Props {
 
 export function CreateAppForm({ github, repos }: Props) {
   const canPick = repos.length > 0;
+  const owners = Array.from(new Set(repos.map((r) => r.owner)));
   const [mode, setMode] = useState<"github" | "manual">(canPick ? "github" : "manual");
+  const [owner, setOwner] = useState(owners[0] ?? "");
+  const [search, setSearch] = useState("");
   const [f, setF] = useState(initial);
   const [selected, setSelected] = useState<GithubRepo | null>(null);
   const [branches, setBranches] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [branchesPending, startBranches] = useTransition();
+
+  const visible = repos.filter(
+    (r) => r.owner === owner && (!search || r.fullName.toLowerCase().includes(search.toLowerCase())),
+  );
+  // Keep the chosen repo in the dropdown even if the search filter no longer matches it.
+  const repoOptions =
+    selected && selected.owner === owner && !visible.includes(selected) ? [selected, ...visible] : visible;
+
+  function pickOwner(e: ChangeEvent<HTMLSelectElement>) {
+    setOwner(e.target.value);
+    setSelected(null);
+    setBranches([]);
+  }
 
   const set =
     (k: keyof typeof initial) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -114,10 +130,30 @@ export function CreateAppForm({ github, repos }: Props) {
         {/* Repo source ------------------------------------------------------ */}
         {mode === "github" ? (
           <>
+            <div className="grid grid-cols-[1fr_1fr] gap-[16px]">
+              <Field label="Account">
+                <Select value={owner} onChange={pickOwner}>
+                  {owners.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Filter">
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search repositories…"
+                />
+              </Field>
+            </div>
             <Field label="Repository" hint="Pick a repo your GitHub App can access. Pushes to the branch auto-deploy.">
               <Select value={selected?.fullName ?? ""} onChange={pickRepo}>
-                <option value="">Select a repository…</option>
-                {repos.map((r) => (
+                <option value="">
+                  {repoOptions.length ? "Select a repository…" : "No repositories match"}
+                </option>
+                {repoOptions.map((r) => (
                   <option key={`${r.installationId}:${r.fullName}`} value={r.fullName}>
                     {r.fullName}
                     {r.private ? " (private)" : ""}
