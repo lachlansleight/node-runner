@@ -19,7 +19,12 @@ export function parseEnvText(text: string): Record<string, string> {
     if (!line || line.startsWith("#")) continue;
     const eq = line.indexOf("=");
     if (eq === -1) continue;
-    out[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+    let value = line.slice(eq + 1).trim();
+    // Strip one pair of matching surrounding quotes, as dotenv would.
+    if (value.length >= 2 && (value[0] === '"' || value[0] === "'") && value.endsWith(value[0])) {
+      value = value.slice(1, -1);
+    }
+    out[line.slice(0, eq).trim()] = value;
   }
   return out;
 }
