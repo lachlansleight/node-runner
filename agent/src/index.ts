@@ -146,6 +146,19 @@ route("POST", "/apps/:id/start", async ({ res, params }) => {
   send(res, 200, apps.redact(app));
 });
 
+// Per-key env editing. Values are write-only: never returned, only keys.
+route("PUT", "/apps/:id/env/:key", async ({ res, params, body }) => {
+  if (!store.get(params.id)) throw new HttpError(404, "app not found");
+  const { value } = (await body()) as { value?: unknown };
+  if (typeof value !== "string") throw new HttpError(400, "body must be { value: string }");
+  send(res, 200, apps.redact(apps.setEnv(params.id, params.key, value)));
+});
+
+route("DELETE", "/apps/:id/env/:key", ({ res, params }) => {
+  if (!store.get(params.id)) throw new HttpError(404, "app not found");
+  send(res, 200, apps.redact(apps.unsetEnv(params.id, params.key)));
+});
+
 route("GET", "/apps/:id/logs", async ({ res, params, url }) => {
   if (!store.get(params.id)) throw new HttpError(404, "app not found");
   const lines = Math.min(Number(url.searchParams.get("lines") ?? 200) || 200, 2000);

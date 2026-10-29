@@ -38,6 +38,22 @@ export async function updateAppAction(id: string, patch: UpdateAppInput): Promis
   return result;
 }
 
+export async function setEnvVarAction(id: string, key: string, value: string): Promise<ActionResult> {
+  const result = await guard(async () => {
+    await agent.setAppEnv(id, key, value);
+  });
+  revalidatePath(`/apps/${id}`);
+  return result;
+}
+
+export async function unsetEnvVarAction(id: string, key: string): Promise<ActionResult> {
+  const result = await guard(async () => {
+    await agent.unsetAppEnv(id, key);
+  });
+  revalidatePath(`/apps/${id}`);
+  return result;
+}
+
 export async function deployAppAction(id: string): Promise<ActionResult> {
   const result = await guard(async () => {
     await agent.deployApp(id);

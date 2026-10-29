@@ -48,6 +48,13 @@ export const createApp = (input: CreateAppInput) =>
   call<DashApp>("/apps", { method: "POST", body: JSON.stringify(input) });
 export const updateApp = (id: string, patch: UpdateAppInput) =>
   call<DashApp>(`/apps/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+export const setAppEnv = (id: string, key: string, value: string) =>
+  call<DashApp>(`/apps/${id}/env/${encodeURIComponent(key)}`, {
+    method: "PUT",
+    body: JSON.stringify({ value }),
+  });
+export const unsetAppEnv = (id: string, key: string) =>
+  call<DashApp>(`/apps/${id}/env/${encodeURIComponent(key)}`, { method: "DELETE" });
 export const deployApp = (id: string) => call<DashApp>(`/apps/${id}/deploy`, { method: "POST" });
 export const stopApp = (id: string) => call<DashApp>(`/apps/${id}/stop`, { method: "POST" });
 export const startApp = (id: string) => call<DashApp>(`/apps/${id}/start`, { method: "POST" });

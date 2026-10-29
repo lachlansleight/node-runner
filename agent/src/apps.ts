@@ -156,6 +156,36 @@ export async function update(id: string, patch: UpdateAppInput): Promise<App> {
   return app;
 }
 
+const ENV_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function assertEnvKey(key: string): void {
+  if (!ENV_KEY.test(key)) throw new ValidationError(`invalid env key: ${key}`);
+}
+
+/** Set (or add) a single env var without touching the others. */
+export function setEnv(id: string, key: string, value: string): App {
+  const app = store.get(id);
+  if (!app) throw new ValidationError(`app not found: ${id}`);
+  assertEnvKey(key);
+  if (typeof value !== "string") throw new ValidationError("value must be a string");
+  app.env = { ...app.env, [key]: value };
+  app.updatedAt = new Date().toISOString();
+  store.upsert(app);
+  return app;
+}
+
+/** Remove a single env var. Removing a key that isn't set is a no-op. */
+export function unsetEnv(id: string, key: string): App {
+  const app = store.get(id);
+  if (!app) throw new ValidationError(`app not found: ${id}`);
+  assertEnvKey(key);
+  const { [key]: _removed, ...rest } = app.env;
+  app.env = rest;
+  app.updatedAt = new Date().toISOString();
+  store.upsert(app);
+  return app;
+}
+
 /** Strip secrets before returning an app over the API. */
 export function redact(app: App): Omit<App, "env"> & { envKeys: string[] } {
   const { env, ...rest } = app;

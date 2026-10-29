@@ -51,7 +51,9 @@ authenticated by GitHub's HMAC signature.
 | GET    | `/apps` | List apps (secrets redacted) |
 | POST   | `/apps` | Create an app |
 | GET    | `/apps/:id` | Get one app |
-| PATCH  | `/apps/:id` | Update config (repo, branch, port, domains, env, …) |
+| PATCH  | `/apps/:id` | Update config (repo, branch, port, domains, env, …); `env` replaces the whole set |
+| PUT    | `/apps/:id/env/:key` | Set one env var (`{ "value": "…" }`) without touching the others |
+| DELETE | `/apps/:id/env/:key` | Remove one env var |
 | DELETE | `/apps/:id` | Stop + remove app and its files |
 | POST   | `/apps/:id/deploy` | Clone/build/restart |
 | POST   | `/apps/:id/stop` · `/start` | PM2 stop/start |
