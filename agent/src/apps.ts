@@ -31,6 +31,18 @@ function normalizeSubdir(subdir: string | undefined): string {
   return s;
 }
 
+/**
+ * Normalize an optional Node version: empty/whitespace clears it (system
+ * default); otherwise it must be a simple fnm-style token like "20", "22.1" or
+ * "lts/iron".
+ */
+function normalizeNodeVersion(version: string | undefined): string | undefined {
+  const v = (version ?? "").trim();
+  if (!v) return undefined;
+  if (!/^[\w./-]+$/.test(v)) throw new ValidationError(`invalid nodeVersion: ${version}`);
+  return v;
+}
+
 function assertDomains(domains: string[], ignoreId?: string): void {
   for (const d of domains) {
     if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(d)) {
@@ -90,7 +102,7 @@ export function create(input: CreateAppInput): App {
     subdir: normalizeSubdir(input.subdir),
     port: input.port,
     domains,
-    nodeVersion: input.nodeVersion,
+    nodeVersion: normalizeNodeVersion(input.nodeVersion),
     env: input.env ?? {},
     status: "created",
     createdAt: now,
@@ -106,6 +118,12 @@ export async function update(id: string, patch: UpdateAppInput): Promise<App> {
 
   if (patch.port !== undefined) assertPort(patch.port, id);
   if (patch.domains !== undefined) assertDomains(patch.domains, id);
+  if (patch.startCommand !== undefined && !patch.startCommand.trim()) {
+    throw new ValidationError("startCommand cannot be empty");
+  }
+  if (patch.branch !== undefined && !patch.branch.trim()) {
+    throw new ValidationError("branch cannot be empty");
+  }
 
   // Re-resolve the repo source only when the patch touches it.
   const repo =
@@ -124,7 +142,8 @@ export async function update(id: string, patch: UpdateAppInput): Promise<App> {
     subdir: patch.subdir !== undefined ? normalizeSubdir(patch.subdir) : app.subdir,
     port: patch.port ?? app.port,
     domains: patch.domains ?? app.domains,
-    nodeVersion: patch.nodeVersion ?? app.nodeVersion,
+    // Empty string clears the pinned version (back to system default).
+    nodeVersion: patch.nodeVersion !== undefined ? normalizeNodeVersion(patch.nodeVersion) : app.nodeVersion,
     env: patch.env ?? app.env,
     updatedAt: new Date().toISOString(),
   });
